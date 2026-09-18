@@ -33,12 +33,26 @@ service cloud.firestore {
       return usuario().jugadorId;
     }
 
-    // Cada usuario puede crear su propio documento (alta de cuenta); el DT
-    // puede crear el de cualquiera (alta de jugadores) y editar cualquiera.
+    // Una cuenta que se crea a sí misma solo puede hacerlo como 'jugador' y
+    // enlazada a un jugadorId que ya exista en el plantel: nunca como 'dt'.
+    // Sin esta validación, `allow create` solo miraba el uid, así que
+    // cualquier persona autenticada podía escribir rol: 'dt' en su propio
+    // documento y ganar todos los permisos — la app hoy no tiene pantalla
+    // de alta (las cuentas las crea el DT o el script de seed), pero la
+    // regla es la barrera real, no la UI.
+    function altaPropiaValida() {
+      return request.resource.data.rol == 'jugador'
+        && request.resource.data.jugadorId is string
+        && exists(/databases/$(database)/documents/jugadores/$(request.resource.data.jugadorId));
+    }
+
+    // Cada usuario puede crear su propio documento (alta de cuenta), con la
+    // validación de arriba; el DT puede crear el de cualquiera (alta de
+    // jugadores) y editar cualquiera.
     match /usuarios/{uid} {
       allow read: if autenticado() && request.auth.uid == uid;
       allow read: if esDT();
-      allow create: if autenticado() && request.auth.uid == uid;
+      allow create: if autenticado() && request.auth.uid == uid && altaPropiaValida();
       allow create: if esDT();
       allow update, delete: if esDT();
     }

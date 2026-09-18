@@ -7,6 +7,25 @@ import '../widgets/comunes.dart';
 import 'convocatoria_pantalla.dart';
 import 'en_vivo_pantalla.dart';
 
+const _diasLargos = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'];
+const _diasCortos = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const _mesesLargos = [
+  'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+  'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE', //
+];
+const _mesesCortos = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/// "MIÉRCOLES 16 · SEPTIEMBRE" — encabezado con la fecha de hoy.
+String _encabezadoFecha(DateTime f) => '${_diasLargos[f.weekday - 1]} ${f.day} · ${_mesesLargos[f.month - 1]}';
+
+/// "Sáb 19 sep  ·  3:30 pm" — fecha y hora del próximo partido.
+String _fechaHoraPartido(DateTime f) {
+  final hora12 = f.hour % 12 == 0 ? 12 : f.hour % 12;
+  final ampm = f.hour < 12 ? 'am' : 'pm';
+  final minuto = f.minute.toString().padLeft(2, '0');
+  return '${_diasCortos[f.weekday - 1]} ${f.day} ${_mesesCortos[f.month - 1]}  ·  $hora12:$minuto $ampm';
+}
+
 /// Inicio: el mismo esqueleto, distinto contenido según permisos.
 class InicioPantalla extends StatelessWidget {
   const InicioPantalla({super.key});
@@ -20,7 +39,7 @@ class InicioPantalla extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 26),
       children: [
-        Text(esDT ? 'MIÉRCOLES 16 · SEPTIEMBRE' : 'TU SEMANA',
+        Text(esDT ? _encabezadoFecha(DateTime.now()) : 'TU SEMANA',
             style: TemaModernista.etiqueta(color: TemaModernista.acento)),
         const SizedBox(height: 6),
         Text(esDT ? 'BUENOS DÍAS, PROFE' : 'HOLA, ${estado.usuario!.apellido.toUpperCase()}',
@@ -65,7 +84,7 @@ class InicioPantalla extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: TemaModernista.esp3),
-              Text('Sáb 19 sep  ·  3:30 pm  ·  ${p.sede}',
+              Text('${_fechaHoraPartido(p.fecha)}  ·  ${p.sede}',
                   style: TemaModernista.cuerpo(tam: 12, color: TemaModernista.neutral800)),
               const SizedBox(height: TemaModernista.esp3),
               if (esDT)
@@ -118,7 +137,8 @@ class InicioPantalla extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${s.fecha.day}', style: TemaModernista.titulo(17)),
-                      Text('SEP', style: TemaModernista.etiqueta(color: TemaModernista.neutral400, tam: 9)),
+                      Text(_mesesCortos[s.fecha.month - 1].toUpperCase(),
+                          style: TemaModernista.etiqueta(color: TemaModernista.neutral400, tam: 9)),
                     ],
                   ),
                 ),

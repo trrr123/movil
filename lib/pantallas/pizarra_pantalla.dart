@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/tema_modernista.dart';
 import '../estado/app_estado.dart';
@@ -231,6 +232,11 @@ class PizarraPantalla extends StatelessWidget {
   }
 }
 
+/// Área táctil de cada ficha: mayor que su tamaño visual (casilla 32×32 +
+/// etiqueta) para dar margen de error al arrastrar.
+const double _anchoToque = 48;
+const double _altoToque = 60;
+
 /// Cancha pintada + fichas arrastrables. Traduce píxeles a coordenadas 0..1
 /// para que la alineación sea independiente del tamaño de pantalla.
 class CanchaWidget extends StatelessWidget {
@@ -262,21 +268,35 @@ class CanchaWidget extends StatelessWidget {
               Positioned.fill(child: CustomPaint(painter: _LineasCancha())),
               for (final f in alineacion.fichas)
                 Positioned(
-                  left: f.punto.x * ancho - 19,
-                  top: f.punto.y * alto - 21,
+                  left: f.punto.x * ancho - _anchoToque / 2,
+                  top: f.punto.y * alto - _altoToque / 2,
                   child: GestureDetector(
+                    // Área invisible más grande que la ficha: tocar la
+                    // camiseta, el nombre o el margen entre ambos arranca el
+                    // arrastre igual — sin esto solo respondían los píxeles
+                    // pintados de cada uno.
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: editable ? (_) => HapticFeedback.selectionClick() : null,
                     onPanUpdate: editable
                         ? (d) => onMover(
                               f.jugador.id,
                               f.punto.desplazado(d.delta.dx / ancho, d.delta.dy / alto),
                             )
                         : null,
-                    child: _Ficha(
-                      dorsal: f.jugador.dorsal,
-                      apellido: f.jugador.apellido,
-                      color: editable
-                          ? (f.jugador.posicion == Posicion.portero ? TemaModernista.tinta : TemaModernista.acento)
-                          : (f.jugador.id == destacado ? TemaModernista.acento : TemaModernista.tinta),
+                    child: SizedBox(
+                      width: _anchoToque,
+                      height: _altoToque,
+                      child: Center(
+                        child: _Ficha(
+                          dorsal: f.jugador.dorsal,
+                          apellido: f.jugador.apellido,
+                          color: editable
+                              ? (f.jugador.posicion == Posicion.portero
+                                  ? TemaModernista.tinta
+                                  : TemaModernista.acento)
+                              : (f.jugador.id == destacado ? TemaModernista.acento : TemaModernista.tinta),
+                        ),
+                      ),
                     ),
                   ),
                 ),

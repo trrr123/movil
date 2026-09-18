@@ -67,8 +67,7 @@ class BotonModernista extends StatelessWidget {
         hoverColor:
             esPrimario ? TemaModernista.acento700 : TemaModernista.acento100,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: TemaModernista.esp4, vertical: TemaModernista.esp3),
+          padding: const EdgeInsets.symmetric(horizontal: TemaModernista.esp4, vertical: 14),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(texto,

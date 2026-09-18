@@ -2,33 +2,56 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../datos/repositorios.dart';
 import '../modelos/alineacion.dart';
 import '../modelos/finanzas.dart';
 import '../modelos/jugador.dart';
 import '../modelos/partido.dart';
 import '../modelos/usuario.dart';
 import '../servicios/auth_servicio.dart';
-import '../servicios/equipo_repositorio.dart';
 import '../servicios/exportable.dart';
+import 'agenda_controlador.dart';
+import 'alineacion_controlador.dart';
+import 'finanzas_controlador.dart';
+import 'partido_en_vivo_controlador.dart';
+import 'plantel_controlador.dart';
 
-/// Único dueño del estado de la app. Expone sólo lo que el rol puede ver:
-/// los getters filtran por [Permiso] antes de devolver datos.
+/// Fachada del estado de la app: orquesta un controlador por función
+/// (plantel, alineación, agenda, partido en vivo, finanzas) y aplica los
+/// permisos antes de delegarles cualquier acción — la UI solo habla con
+/// esta clase, nunca con los controladores directamente. Expone sólo lo
+/// que el rol puede ver: los getters filtran por [Permiso] antes de
+/// devolver datos.
+///
+/// Los casos que cruzan dos controladores (ej. [sustituir], que también
+/// anota un cambio en el partido si está en vivo) se coordinan acá: es el
+/// único lugar que conoce a todos.
 class AppEstado extends ChangeNotifier {
-  AppEstado({required AuthServicio auth, required EquipoRepositorio repo})
+  AppEstado({required AuthServicio auth, required Repositorios repositorios})
       : _auth = auth,
-        _repo = repo;
+        _repositorios = repositorios,
+        _plantel = PlantelControlador(repositorios.jugadores),
+        _alineacion = AlineacionControlador(repositorios.alineaciones),
+        _agenda = AgendaControlador(repositorios.partidos, repositorios.sesiones),
+        _partidoEnVivo = PartidoEnVivoControlador(),
+        _finanzas = FinanzasControlador(repositorios.caja) {
+    for (final c in _controladores) {
+      c.addListener(notifyListeners);
+    }
+  }
 
   final AuthServicio _auth;
-  final EquipoRepositorio _repo;
+  final Repositorios _repositorios;
   final ServicioExportacion _exportacion = const ServicioExportacion();
 
-  late List<Jugador> _plantel;
-  late List<Partido> _partidos;
-  late List<SesionEntrenamiento> _sesiones;
-  late CajaMensual _caja;
-  late List<Alineacion> _alineaciones;
-  late Alineacion _alineacionActiva;
-  late Convocatoria _convocatoria;
+  final PlantelControlador _plantel;
+  final AlineacionControlador _alineacion;
+  final AgendaControlador _agenda;
+  final PartidoEnVivoControlador _partidoEnVivo;
+  final FinanzasControlador _finanzas;
+
+  List<ChangeNotifier> get _controladores => [_plantel, _alineacion, _agenda, _partidoEnVivo, _finanzas];
+
   String _nombreClub = '';
   String _categoria = '';
 
@@ -36,13 +59,12 @@ class AppEstado extends ChangeNotifier {
   bool _cargandoDatos = false;
 
   String? _aviso;
-  Timer? _reloj;
 
   /// Nombre y categoría del club: es lo único legible sin sesión (para que
   /// la pantalla de login lo muestre), así que se carga apenas arranca la
   /// app, antes de cualquier login.
   Future<void> cargarClub() async {
-    final club = await _repo.cargarClub();
+    final club = await _repositorios.club.cargar();
     _nombreClub = club.nombreClub;
     _categoria = club.categoria;
     _cargandoClub = false;
@@ -53,18 +75,11 @@ class AppEstado extends ChangeNotifier {
   /// detrás de las reglas de Firestore que exigen sesión iniciada, así que
   /// se trae recién después de un login exitoso (ver [ingresar]).
   Future<void> _cargarDatosDelClub() async {
-    _plantel = await _repo.cargarPlantel();
-    _partidos = await _repo.cargarPartidos();
-    _sesiones = await _repo.cargarSesiones();
-    _caja = await _repo.cargarCaja(_plantel);
-    _alineaciones = await _repo.cargarAlineaciones(_plantel);
-    _alineacionActiva = _alineaciones.first;
-    _convocatoria = Convocatoria(partidoId: _partidos.first.id)
-      ..let((c) {
-        for (final j in _plantel.where((j) => j.disponible).take(16)) {
-          c.alternar(j);
-        }
-      });
+    await _plantel.cargar();
+    final plantel = _plantel.plantel;
+    await _agenda.cargar(plantel);
+    await _finanzas.cargar(plantel);
+    await _alineacion.cargar(plantel);
   }
 
   // ── Sesión ───────────────────────────────────────────────────────────
@@ -103,7 +118,7 @@ class AppEstado extends ChangeNotifier {
   }
 
   void salir() {
-    _reloj?.cancel();
+    _partidoEnVivo.detenerReloj();
     _auth.salir();
     notifyListeners();
   }
@@ -121,62 +136,52 @@ class AppEstado extends ChangeNotifier {
   Jugador? get miFicha {
     final u = usuario;
     if (u is! JugadorUsuario) return null;
-    return _plantel.firstWhere((j) => j.id == u.jugadorId);
+    return _plantel.plantel.firstWhere((j) => j.id == u.jugadorId);
   }
 
   // ── Plantel ──────────────────────────────────────────────────────────
-  List<Jugador> get plantel => List.unmodifiable(_plantel);
-  int get lesionados => _plantel.where((j) => !j.disponible).length;
+  List<Jugador> get plantel => _plantel.plantel;
+  int get lesionados => _plantel.lesionados;
 
-  List<Jugador> buscar(String texto, Posicion? filtro) => _plantel.where((j) {
-        final q = texto.trim().toLowerCase();
-        final coincide = q.isEmpty || j.nombre.toLowerCase().contains(q) || j.dorsal.toString() == q;
-        return coincide && (filtro == null || j.posicion == filtro);
-      }).toList();
+  List<Jugador> buscar(String texto, Posicion? filtro) => _plantel.buscar(texto, filtro);
 
   /// Regla central de privacidad: sólo el DT abre fichas ajenas.
   bool puedeAbrirFicha(Jugador j) =>
       puede(Permiso.verFichaAjena) || (usuario is JugadorUsuario && (usuario as JugadorUsuario).jugadorId == j.id);
 
   // ── Alineación ───────────────────────────────────────────────────────
-  Alineacion get alineacion => _alineacionActiva;
-  List<Alineacion> get alineacionesGuardadas => List.unmodifiable(_alineaciones);
-  List<Jugador> get banca => _plantel.where((j) => !_alineacionActiva.contiene(j.id)).toList();
+  Alineacion get alineacion => _alineacion.activa;
+  List<Alineacion> get alineacionesGuardadas => _alineacion.guardadas;
+  List<Jugador> get banca => _plantel.plantel.where((j) => !_alineacion.activa.contiene(j.id)).toList();
 
   void aplicarFormacion(Formacion f) {
     if (!puede(Permiso.editarAlineacion)) return;
-    _alineacionActiva.aplicarFormacion(f);
-    notifyListeners();
+    _alineacion.aplicarFormacion(f);
   }
 
   void moverFicha(int jugadorId, PuntoCampo destino) {
     if (!puede(Permiso.editarAlineacion)) return;
-    _alineacionActiva.moverFicha(jugadorId, destino);
-    notifyListeners();
+    _alineacion.moverFicha(jugadorId, destino);
   }
 
   void sustituir({required int saleId, required Jugador entra}) {
     if (!puede(Permiso.editarAlineacion)) return;
-    final sale = _plantel.firstWhere((j) => j.id == saleId);
-    _alineacionActiva.sustituir(saleId: saleId, entra: entra);
+    final sale = _plantel.plantel.firstWhere((j) => j.id == saleId);
+    _alineacion.sustituir(saleId: saleId, entra: entra);
     if (partidoActual.enJuego) {
-      partidoActual.anotar(Cambio(minuto: partidoActual.minuto, sale: sale, entra: entra));
+      _partidoEnVivo.registrarCambio(partidoActual, sale: sale, entra: entra);
     }
     avisar('Entra ${entra.apellido} por ${sale.apellido}');
   }
 
   void guardarAlineacion() {
     if (!puede(Permiso.editarAlineacion)) return;
-    final copia = _alineacionActiva.duplicar(
-      nuevoId: DateTime.now().millisecondsSinceEpoch,
-      nuevoNombre: 'Alineación ${_alineacionActiva.formacion.nombre}',
-    );
-    _alineaciones.insert(0, copia);
+    _alineacion.guardar();
     avisar('Alineación guardada en el club');
   }
 
   void cargarAlineacion(Alineacion a) {
-    _alineacionActiva = a;
+    _alineacion.cargarGuardada(a);
     avisar('Cargada: ${a.nombre}');
   }
 
@@ -189,125 +194,107 @@ class AppEstado extends ChangeNotifier {
   }
 
   // ── Agenda, convocatoria y asistencia ────────────────────────────────
-  List<Partido> get partidos => List.unmodifiable(_partidos);
-  Partido get partidoActual => _partidos.first;
-  List<SesionEntrenamiento> get sesiones => List.unmodifiable(_sesiones);
-  Convocatoria get convocatoria => _convocatoria;
+  List<Partido> get partidos => _agenda.partidos;
+  Partido get partidoActual => _agenda.actual;
+  List<SesionEntrenamiento> get sesiones => _agenda.sesiones;
+  Convocatoria get convocatoria => _agenda.convocatoria;
 
   bool estoyConvocado() {
     final f = miFicha;
-    return f != null && _convocatoria.incluye(f.id);
+    return f != null && _agenda.convocatoria.incluye(f.id);
   }
 
   bool soyTitular() {
     final f = miFicha;
-    return f != null && _alineacionActiva.contiene(f.id);
+    return f != null && _alineacion.activa.contiene(f.id);
   }
 
   void alternarConvocado(Jugador j) {
     if (!puede(Permiso.gestionarConvocatoria)) return;
-    if (!_convocatoria.alternar(j)) {
-      avisar(j.disponible ? 'Tope de ${_convocatoria.tope} convocados' : '${j.apellido} está lesionado');
-      return;
+    if (!_agenda.alternarConvocado(j)) {
+      avisar(j.disponible ? 'Tope de ${_agenda.convocatoria.tope} convocados' : '${j.apellido} está lesionado');
     }
-    notifyListeners();
   }
 
   void enviarConvocatoria() {
     if (!puede(Permiso.gestionarConvocatoria)) return;
-    _convocatoria.enviar();
-    avisar('Citación enviada a ${_convocatoria.total} jugadores');
+    _agenda.enviarConvocatoria();
+    avisar('Citación enviada a ${_agenda.convocatoria.total} jugadores');
   }
 
   void marcarAsistencia(SesionEntrenamiento s, Jugador j, bool presente) {
     if (!puede(Permiso.registrarAsistencia)) return;
-    s.marcar(j.id, presente);
-    notifyListeners();
+    _agenda.marcarAsistencia(s, j, presente);
   }
 
   // ── Partido en vivo ──────────────────────────────────────────────────
   void iniciarPartido() {
     if (!puede(Permiso.dirigirPartido)) return;
-    partidoActual
-      ..iniciar()
-      ..registrarEnCampo(_alineacionActiva.titulares);
-    _reloj?.cancel();
-    _reloj = Timer.periodic(const Duration(seconds: 4), (_) {
-      partidoActual.avanzarMinuto();
-      notifyListeners();
-    });
-    notifyListeners();
+    _partidoEnVivo.iniciar(partidoActual, _alineacion.activa.titulares);
   }
 
   void alternarReloj() {
     if (!puede(Permiso.dirigirPartido)) return;
-    partidoActual.alternarReloj();
-    notifyListeners();
+    _partidoEnVivo.alternarReloj(partidoActual);
   }
 
   void anotarGol({Jugador? autor, Jugador? asistente, bool rival = false}) {
     if (!puede(Permiso.dirigirPartido)) return;
-    final goleador = autor ?? _alineacionActiva.titulares.last;
-    partidoActual.anotar(Gol(minuto: partidoActual.minuto, autor: goleador, asistente: asistente, rival: rival));
-    goleador.registrarPartido(goles: rival ? 0 : 1);
+    final goleador = autor ?? _alineacion.activa.titulares.last;
+    _partidoEnVivo.anotarGol(partidoActual, goleador: goleador, asistente: asistente, rival: rival);
     avisar(rival ? 'Gol del rival' : '¡Gol de ${goleador.apellido}!');
   }
 
   void anotarTarjeta(Jugador j, {ColorTarjeta color = ColorTarjeta.amarilla}) {
     if (!puede(Permiso.dirigirPartido)) return;
-    partidoActual.anotar(Tarjeta(minuto: partidoActual.minuto, jugador: j, color: color));
-    notifyListeners();
+    _partidoEnVivo.anotarTarjeta(partidoActual, j, color: color);
   }
 
   void finalizarPartido() {
     if (!puede(Permiso.dirigirPartido)) return;
-    _reloj?.cancel();
-    partidoActual.finalizar();
+    _partidoEnVivo.finalizar(partidoActual);
     avisar('Partido cerrado · estadísticas guardadas');
   }
 
   // ── Dinero ───────────────────────────────────────────────────────────
-  CajaMensual get caja => _caja;
+  CajaMensual get caja => _finanzas.caja;
 
   /// El DT ve la caja completa; el jugador sólo su cuota.
   List<Cuota> get cuotasVisibles {
-    if (puede(Permiso.verFinanzasClub)) return _caja.cuotas;
+    if (puede(Permiso.verFinanzasClub)) return _finanzas.caja.cuotas;
     final f = miFicha;
-    return f == null ? const [] : [_caja.deJugador(f.id)];
+    return f == null ? const [] : [_finanzas.caja.deJugador(f.id)];
   }
 
   Cuota? get miCuota {
     final f = miFicha;
-    return f == null ? null : _caja.deJugador(f.id);
+    return f == null ? null : _finanzas.caja.deJugador(f.id);
   }
 
   void reportarMiPago() {
     final c = miCuota;
     if (c == null || !puede(Permiso.verFinanzasPropias)) return;
-    c.reportarPago();
+    _finanzas.reportarPago(c);
     avisar('Pago reportado · pendiente de confirmación');
   }
 
   void confirmarPago(Cuota c) {
     if (!puede(Permiso.verFinanzasClub)) return;
-    c.confirmarPago();
-    notifyListeners();
+    _finanzas.confirmarPago(c);
   }
 
   void enviarRecordatorio() {
     if (!puede(Permiso.verFinanzasClub)) return;
-    avisar('Recordatorio enviado a ${_caja.pendientes} acudientes');
+    avisar('Recordatorio enviado a ${_finanzas.caja.pendientes} acudientes');
   }
 
   @override
   void dispose() {
-    _reloj?.cancel();
+    for (final c in _controladores) {
+      c.dispose();
+    }
     super.dispose();
   }
-}
-
-extension _Let<T> on T {
-  void let(void Function(T) fn) => fn(this);
 }
 
 /// Inyección del estado en el árbol de widgets sin dependencias externas.

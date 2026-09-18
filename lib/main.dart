@@ -2,13 +2,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'core/tema_modernista.dart';
+import 'datos/repositorios.dart';
 import 'estado/app_estado.dart';
 import 'firebase_options.dart';
 import 'pantallas/login_pantalla.dart';
 import 'pantallas/shell_pantalla.dart';
 import 'pantallas/splash_pantalla.dart';
 import 'servicios/auth_servicio.dart';
-import 'servicios/equipo_repositorio.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +17,11 @@ Future<void> main() async {
 }
 
 class AppMakuira extends StatefulWidget {
-  const AppMakuira({super.key, this.auth, this.repo});
+  const AppMakuira({super.key, this.auth, this.repositorios});
 
   /// Permite inyectar servicios demo en los tests, sin pasar por Firebase.
   final AuthServicio? auth;
-  final EquipoRepositorio? repo;
+  final Repositorios? repositorios;
 
   @override
   State<AppMakuira> createState() => _AppMakuiraState();
@@ -30,7 +30,7 @@ class AppMakuira extends StatefulWidget {
 class _AppMakuiraState extends State<AppMakuira> {
   late final AppEstado _estado = AppEstado(
     auth: widget.auth ?? AuthFirebase(),
-    repo: widget.repo ?? EquipoRepositorioFirestore(),
+    repositorios: widget.repositorios ?? Repositorios.firestore(),
   );
 
   @override

@@ -3,14 +3,14 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:makuira_gestion/datos/repositorios.dart';
 import 'package:makuira_gestion/main.dart';
 import 'package:makuira_gestion/servicios/auth_servicio.dart';
-import 'package:makuira_gestion/servicios/equipo_repositorio.dart';
 
 /// Los tests usan los servicios demo (en memoria) en vez de Firebase: no hay
 /// forma de inicializar los plugins nativos en un `flutter test` sin
 /// dispositivo, y no es lo que estos tests están verificando.
-Widget _appDemo() => AppMakuira(auth: AuthEnMemoria(), repo: EquipoRepositorioDemo());
+Widget _appDemo() => AppMakuira(auth: AuthEnMemoria(), repositorios: Repositorios.demo());
 
 void main() {
   testWidgets('la app arranca con el splash y pasa al login', (WidgetTester tester) async {

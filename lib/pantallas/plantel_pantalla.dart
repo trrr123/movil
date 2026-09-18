@@ -57,6 +57,18 @@ class _PlantelPantallaState extends State<PlantelPantalla> {
         ),
         const SizedBox(height: TemaModernista.esp3),
         const Regla(),
+        if (lista.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: TemaModernista.esp5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Kicker('Sin resultados'),
+                Text('Nadie coincide con esa búsqueda.',
+                    style: TemaModernista.cuerpo(tam: 12, color: TemaModernista.neutral400)),
+              ],
+            ),
+          ),
         for (final j in lista)
           InkWell(
             onTap: () {

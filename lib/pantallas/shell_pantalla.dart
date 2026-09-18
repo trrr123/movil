@@ -95,7 +95,12 @@ class _ShellPantallaState extends State<ShellPantalla> {
             Expanded(
                 child: ContenidoResponsivo(
                     child: destinos[indice].constructor(context))),
-            if (estado.aviso != null) _Aviso(texto: estado.aviso!),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: estado.aviso != null ? _Aviso(texto: estado.aviso!) : const SizedBox(width: double.infinity),
+            ),
             const Regla(),
             _NavInferior(
               destinos: destinos,
