@@ -1,0 +1,107 @@
+rules_version = '2';
+
+// Modelo de permisos (replica el de AppEstado/Usuario en Dart):
+// - DT: lee y escribe todo.
+// - Jugador: lee plantel/agenda/alineaciones, solo escribe su propia cuota
+//   (reportar pago) y su propia asistencia no aplica (la marca el DT).
+//
+// Limitación conocida: Firestore no filtra campos dentro de un documento,
+// así que un jugador autenticado que lea `jugadores/{id}` directo (no vía
+// la UI) puede ver minutos/goles/estado médico de sus compañeros aunque la
+// app se los oculte. Resolverlo bien requeriría duplicar datos en una
+// colección pública reducida o una Cloud Function — queda pendiente.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function usuario() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function esDT() {
+      return autenticado() && usuario().rol == 'dt';
+    }
+
+    function esJugador() {
+      return autenticado() && usuario().rol == 'jugador';
+    }
+
+    function miJugadorId() {
+      return usuario().jugadorId;
+    }
+
+    // Cada usuario puede crear su propio documento (alta de cuenta); el DT
+    // puede crear el de cualquiera (alta de jugadores) y editar cualquiera.
+    match /usuarios/{uid} {
+      allow read: if autenticado() && request.auth.uid == uid;
+      allow read: if esDT();
+      allow create: if autenticado() && request.auth.uid == uid;
+      allow create: if esDT();
+      allow update, delete: if esDT();
+    }
+
+    // Público de lectura: la pantalla de login muestra el nombre del club
+    // antes de que la persona inicie sesión, y no es información sensible.
+    match /club/{docId} {
+      allow read: if true;
+      allow write: if esDT();
+    }
+
+    match /jugadores/{jugadorId} {
+      allow read: if autenticado();
+      allow write: if esDT();
+    }
+
+    match /partidos/{partidoId} {
+      allow read: if autenticado();
+      allow write: if esDT();
+
+      match /eventos/{eventoId} {
+        allow read: if autenticado();
+        allow write: if esDT();
+      }
+    }
+
+    match /sesiones/{sesionId} {
+      allow read: if autenticado();
+      allow write: if esDT();
+    }
+
+    match /alineaciones/{alineacionId} {
+      allow read: if autenticado();
+      allow write: if esDT();
+    }
+
+    match /convocatorias/{partidoId} {
+      allow read: if autenticado();
+      allow write: if esDT();
+    }
+
+    // Caja: lectura abierta a cualquier persona logueada (igual que
+    // jugadores/partidos/sesiones) — el filtro de "el jugador solo ve la
+    // suya" ya lo aplica AppEstado del lado del cliente. Se evita a
+    // propósito una regla de lectura que dependa de esDT() (que hace un
+    // get() interno): en consultas de lista, ese patrón resultó poco
+    // confiable en el SDK nativo de Android (funcionaba por REST pero
+    // fallaba de forma intermitente desde la app).
+    match /caja/{periodo} {
+      allow read: if autenticado();
+      allow write: if esDT();
+
+      match /cuotas/{jugadorId} {
+        allow read: if autenticado();
+        allow create, delete: if esDT();
+        // El jugador solo puede cambiar su cuota de "pendiente" a
+        // "reportada" (reportar pago); todo lo demás, solo el DT.
+        allow update: if esDT() ||
+          (esJugador() && miJugadorId() == jugadorId &&
+           resource.data.estado == 'pendiente' &&
+           request.resource.data.estado == 'reportada' &&
+           request.resource.data.monto == resource.data.monto);
+      }
+    }
+  }
+}

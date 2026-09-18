@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Solo para debug-overrides (nunca aplica a un build de release firmado):
+  agrega el certificado raíz de Norton, que intercepta el tráfico HTTPS en
+  esta máquina de desarrollo (antivirus con "Web/Mail Shield" activado),
+  para que el emulador pueda validar la conexión a Firebase mientras se
+  desarrolla acá. No debilita la seguridad de la app en producción.
+-->
+<network-security-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/norton_root" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

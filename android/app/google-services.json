@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "503890321319",
+    "project_id": "movil-95965",
+    "storage_bucket": "movil-95965.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:503890321319:android:666418d1925e09c9cca082",
+        "android_client_info": {
+          "package_name": "com.example.makuira_gestion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDa-8W2BmlFwGKi9G9Fon6S6zThzB8h5mY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

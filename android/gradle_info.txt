@@ -1,0 +1,67 @@
+﻿.\gradlew.bat : WARNING: A restricted method in java.lang.System has been called
+En línea: 3 Carácter: 1
++ .\gradlew.bat help --info *> gradle_info.txt
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: A rest...has been called:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an 
+unnamed module (file:/C:/Users/torom/.gradle/wrapper/dists/gradle-9.3.1-all/9ot9r568e8zfvvd4mn8rbu1j0/gradle-9.3.1/lib/
+native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Initialized native services in: C:\Users\torom\.gradle\native
+Initialized jansi services in: C:\Users\torom\.gradle\native
+The client will now receive all logging from the daemon (pid: 4072). The daemon log file: C:\Users\torom\.gradle\daemon\9.3.1\daemon-4072.out.log
+Starting 15th build in daemon [uptime: 1 hrs 21 mins 0.739 secs, performance: 100%, GC rate: 0.00/s, heap usage: 0% of 8 GiB, non-heap usage: 5% of 4 GiB]
+Using 8 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=false, configureOnDemand=false, configurationCache=false, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=false, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Now considering [C:\Users\torom\Desktop\flutter\android, C:\Users\torom\Desktop\flu\flutter\packages\flutter_tools\gradle] as hierarchies to watch
+Watching the file system is configured to be enabled if available
+File system watching is active
+Starting Build
+Now considering [C:\Users\torom\Desktop\flu\flutter\packages\flutter_tools\gradle, C:\Users\torom\Desktop\flutter\android] as hierarchies to watch
+
+> Configure project :gradle
+Evaluating project ':gradle' using build file 'C:\Users\torom\Desktop\flu\flutter\packages\flutter_tools\gradle\build.gradle.kts'.
+Resolved plugin [id: 'org.gradle.java-gradle-plugin']
+Resolved plugin [id: 'org.gradle.groovy']
+Resolved plugin [id: 'org.gradle.kotlin.kotlin-dsl', version: '6.4.2']
+Resolved plugin [id: 'org.jetbrains.kotlin.jvm', version: '2.2.20']
+Build 62945f52-89e7-447e-9b57-c8ed1b415486 is started
+Using Kotlin Gradle Plugin gradle813 variant
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+file or directory 'C:\Users\torom\Desktop\flu\flutter\packages\flutter_tools\gradle\src\main\java', not found
+Resolved plugin [id: 'dev.flutter.flutter-plugin-loader', version: '1.0.0']
+Resolved plugin [id: 'com.android.application', version: '9.1.0', apply: false]
+Resolved plugin [id: 'com.google.gms.google-services', version: '4.4.2', apply: false]
+Build 62945f52-89e7-447e-9b57-c8ed1b415486 is closed
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Settings file 'C:\Users\torom\Desktop\flutter\android\settings.gradle.kts' line: 20
+
+* What went wrong:
+Plugin [id: 'com.google.gms.google-services', version: '4.4.2', apply: false] was not found in any of the following 
+sources:
+
+- Gradle Core Plugins (plugin is not in 'org.gradle' namespace)
+- Included Builds (No included builds contain this plugin)
+- Plugin Repositories (could not resolve plugin artifact 
+'com.google.gms.google-services:com.google.gms.google-services.gradle.plugin:4.4.2')
+  Searched in the following repositories:
+    Google
+    MavenRepo
+    Gradle Central Plugin Repository
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+Watched directory hierarchies: [C:\Users\torom\Desktop\flu\flutter\packages\flutter_tools\gradle, C:\Users\torom\Desktop\flutter\android]
