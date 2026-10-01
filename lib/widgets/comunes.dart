@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/tema_modernista.dart';
 
@@ -31,8 +32,8 @@ class Kicker extends StatelessWidget {
 
 enum VarianteBoton { primario, secundario, fantasma }
 
-/// Botón del sistema: sin radio, etiqueta al ras izquierdo.
-class BotonModernista extends StatelessWidget {
+/// Botón del sistema: sin radio, escala táctil inmediata al presionar.
+class BotonModernista extends StatefulWidget {
   const BotonModernista(
     this.texto, {
     super.key,
@@ -47,37 +48,57 @@ class BotonModernista extends StatelessWidget {
   final bool expandido;
 
   @override
+  State<BotonModernista> createState() => _BotonModernistaState();
+}
+
+class _BotonModernistaState extends State<BotonModernista> {
+  bool _presionado = false;
+
+  @override
   Widget build(BuildContext context) {
-    final esPrimario = variante == VarianteBoton.primario;
+    final esPrimario = widget.variante == VarianteBoton.primario;
     final fondo = esPrimario ? TemaModernista.acento : Colors.transparent;
-    final borde = variante == VarianteBoton.fantasma
+    final borde = widget.variante == VarianteBoton.fantasma
         ? Colors.transparent
         : TemaModernista.divisor;
     final tinta = esPrimario ? Colors.white : TemaModernista.tinta;
 
-    final boton = Material(
-      color: fondo,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-        side: BorderSide(
-            color: borde, width: esPrimario ? 0 : TemaModernista.reglaFina),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        hoverColor:
-            esPrimario ? TemaModernista.acento700 : TemaModernista.acento100,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: TemaModernista.esp4, vertical: 14),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(texto,
-                style: TemaModernista.cuerpo(
-                    tam: 14, color: tinta, peso: FontWeight.w600)),
+    final boton = AnimatedScale(
+      scale: _presionado ? 0.97 : 1.0,
+      duration: Duration(milliseconds: _presionado ? 80 : 220),
+      curve: _presionado ? Curves.easeIn : Curves.easeOut,
+      child: Material(
+        color: fondo,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+          side: BorderSide(
+              color: borde,
+              width: esPrimario ? 0 : TemaModernista.reglaFina),
+        ),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onTap?.call();
+          },
+          onHighlightChanged: (v) => setState(() => _presionado = v),
+          hoverColor:
+              esPrimario ? TemaModernista.acento700 : TemaModernista.acento100,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: TemaModernista.esp4, vertical: 14),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(widget.texto,
+                  style: TemaModernista.cuerpo(
+                      tam: 14, color: tinta, peso: FontWeight.w600)),
+            ),
           ),
         ),
       ),
     );
-    return expandido ? SizedBox(width: double.infinity, child: boton) : boton;
+    return widget.expandido
+        ? SizedBox(width: double.infinity, child: boton)
+        : boton;
   }
 }
 

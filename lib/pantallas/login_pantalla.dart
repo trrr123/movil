@@ -5,7 +5,7 @@ import '../estado/app_estado.dart';
 import '../servicios/auth_servicio.dart';
 import '../widgets/comunes.dart';
 
-/// Puerta de entrada: sin sesión no hay datos del club en pantalla.
+/// Puerta de entrada: hero oscuro + formulario limpio.
 class LoginPantalla extends StatefulWidget {
   const LoginPantalla({super.key});
 
@@ -15,9 +15,9 @@ class LoginPantalla extends StatefulWidget {
 
 class _LoginPantallaState extends State<LoginPantalla> {
   final _correo = TextEditingController();
-  final _clave = TextEditingController();
+  final _clave  = TextEditingController();
   String? _error;
-  bool _cargando = false;
+  bool    _cargando = false;
 
   @override
   void dispose() {
@@ -30,7 +30,7 @@ class _LoginPantallaState extends State<LoginPantalla> {
       {String? correo, String? clave}) async {
     setState(() {
       _cargando = true;
-      _error = null;
+      _error    = null;
     });
     try {
       await estado.ingresar(correo ?? _correo.text, clave ?? _clave.text);
@@ -44,52 +44,78 @@ class _LoginPantallaState extends State<LoginPantalla> {
   @override
   Widget build(BuildContext context) {
     final estado = AlcanceApp.de(context);
-    final demo = AuthEnMemoria.cuentasDemo();
+    final demo   = AuthEnMemoria.cuentasDemo();
 
     return Scaffold(
+      backgroundColor: TemaModernista.fondo,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(height: 10, color: TemaModernista.acento),
+            // ── Hero oscuro ────────────────────────────────────────────────
+            Container(
+              color: TemaModernista.fondoOscuro,
+              padding: const EdgeInsets.fromLTRB(
+                  TemaModernista.esp5, TemaModernista.esp5,
+                  TemaModernista.esp5, TemaModernista.esp7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Logo + nombre
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        color: TemaModernista.acento,
+                        alignment: Alignment.center,
+                        child: Text('M',
+                            style: TemaModernista.titulo(20,
+                                color: Colors.white)),
+                      ),
+                      const SizedBox(width: TemaModernista.esp3),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(estado.nombreClub.toUpperCase(),
+                              style: TemaModernista.titulo(15,
+                                  color: Colors.white)),
+                          Text(estado.categoria.toUpperCase(),
+                              style: TemaModernista.etiqueta(
+                                  color: TemaModernista.neutral400, tam: 9)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TemaModernista.esp7),
+                  // Frase hero
+                  Text('GESTIONA.',
+                      style: TemaModernista.titulo(48, color: Colors.white)),
+                  Text('DIRIGE.',
+                      style: TemaModernista.titulo(48, color: Colors.white)),
+                  Text('GANA.',
+                      style: TemaModernista.titulo(48,
+                          color: TemaModernista.acento)),
+                ],
+              ),
+            ),
+            // ── Formulario ────────────────────────────────────────────────
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                padding: const EdgeInsets.fromLTRB(
+                    TemaModernista.esp5, TemaModernista.esp5,
+                    TemaModernista.esp5, TemaModernista.esp5),
                 child: ContenidoResponsivo(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            color: TemaModernista.acento,
-                            alignment: Alignment.center,
-                            child: Text('M',
-                                style: TemaModernista.titulo(19)
-                                    .copyWith(color: Colors.white)),
-                          ),
-                          const SizedBox(width: TemaModernista.esp3),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(estado.nombreClub.toUpperCase(),
-                                  style: TemaModernista.titulo(16)),
-                              Text(estado.categoria.toUpperCase(),
-                                  style: TemaModernista.etiqueta(
-                                      color: TemaModernista.neutral800,
-                                      tam: 9)),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: TemaModernista.esp6),
-                      Text('INGRESAR', style: TemaModernista.titulo(32)),
+                      Text('INGRESAR', style: TemaModernista.titulo(26)),
                       const SizedBox(height: TemaModernista.esp4),
                       TextField(
                         controller: _correo,
                         decoration: const InputDecoration(
-                            labelText: 'CORREO', hintText: 'nombre@makuira.co'),
+                            labelText: 'CORREO',
+                            hintText: 'nombre@makuira.co'),
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.username],
                       ),
@@ -113,7 +139,8 @@ class _LoginPantallaState extends State<LoginPantalla> {
                           ),
                           child: Text(_error!,
                               style: TemaModernista.cuerpo(
-                                  tam: 12, color: TemaModernista.acento700)),
+                                  tam: 12,
+                                  color: TemaModernista.acento700)),
                         ),
                       ],
                       const SizedBox(height: TemaModernista.esp4),
@@ -125,19 +152,25 @@ class _LoginPantallaState extends State<LoginPantalla> {
                       const Regla(),
                       const SizedBox(height: TemaModernista.esp4),
                       const Kicker('Acceso de demostración'),
+                      // Lista de demo
                       Container(
-                        color: TemaModernista.neutral300,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: TemaModernista.neutral300,
+                              width: TemaModernista.reglaFina),
+                        ),
                         child: Column(
                           children: [
                             for (final u in demo) ...[
                               InkWell(
                                 onTap: () => _entrar(estado,
                                     correo: u.correo,
-                                    clave: estado.esAuthEnMemoria ? '1234' : 'makuira2026'),
-                                child: Container(
-                                  color: TemaModernista.fondo,
-                                  padding:
-                                      const EdgeInsets.all(TemaModernista.esp3),
+                                    clave: estado.esAuthEnMemoria
+                                        ? '1234'
+                                        : 'makuira2026'),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(
+                                      TemaModernista.esp3),
                                   child: Row(
                                     children: [
                                       SizedBox(
@@ -153,7 +186,8 @@ class _LoginPantallaState extends State<LoginPantalla> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(u.nombre,
-                                                style: TemaModernista.cuerpo()),
+                                                style:
+                                                    TemaModernista.cuerpo()),
                                             Text(u.correo,
                                                 style: TemaModernista.cuerpo(
                                                     tam: 11,
@@ -162,13 +196,19 @@ class _LoginPantallaState extends State<LoginPantalla> {
                                           ],
                                         ),
                                       ),
-                                      const Text('→'),
+                                      Text('→',
+                                          style: TemaModernista.cuerpo(
+                                              color:
+                                                  TemaModernista.neutral400)),
                                     ],
                                   ),
                                 ),
                               ),
-                              if (u != demo.last) const SizedBox(height: 1),
-                            ]
+                              if (u != demo.last)
+                                const Regla(
+                                    grosor: TemaModernista.reglaFina,
+                                    color: TemaModernista.neutral300),
+                            ],
                           ],
                         ),
                       ),

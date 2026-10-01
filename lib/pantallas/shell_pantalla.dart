@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/tema_modernista.dart';
 import '../estado/app_estado.dart';
@@ -20,8 +21,7 @@ class Destino {
   final WidgetBuilder constructor;
 }
 
-/// Carcasa de la app: barra superior, contenido y navegación por rol.
-/// El DT y el jugador reciben listas de destinos distintas.
+/// Carcasa de la app: chrome oscuro (header + nav), contenido sobre blanco.
 class ShellPantalla extends StatefulWidget {
   const ShellPantalla({super.key});
 
@@ -81,31 +81,48 @@ class _ShellPantallaState extends State<ShellPantalla> {
     ];
   }
 
+  void _cambiarTab(int i) {
+    if (i == _indice) return;
+    HapticFeedback.selectionClick();
+    setState(() => _indice = i);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final estado = AlcanceApp.de(context);
+    final estado   = AlcanceApp.de(context);
     final destinos = _destinos(estado);
-    final indice = _indice.clamp(0, destinos.length - 1);
+    final indice   = _indice.clamp(0, destinos.length - 1);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
+            // ── Header oscuro ───────────────────────────────────────────────
             _BarraSuperior(estado: estado),
+
+            // ── Contenido (fondo blanco) ───────────────────────────────────
             Expanded(
                 child: ContenidoResponsivo(
                     child: destinos[indice].constructor(context))),
+
+            // ── Aviso (animado) ────────────────────────────────────────────
             AnimatedSize(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
               alignment: Alignment.topCenter,
-              child: estado.aviso != null ? _Aviso(texto: estado.aviso!) : const SizedBox(width: double.infinity),
+              child: estado.aviso != null
+                  ? _Aviso(texto: estado.aviso!)
+                  : const SizedBox(width: double.infinity),
             ),
-            const Regla(),
+
+            // ── Línea roja divisora ────────────────────────────────────────
+            const Regla(color: TemaModernista.acento),
+
+            // ── Nav inferior oscura ────────────────────────────────────────
             _NavInferior(
               destinos: destinos,
               indice: indice,
-              onCambiar: (i) => setState(() => _indice = i),
+              onCambiar: _cambiarTab,
             ),
           ],
         ),
@@ -113,6 +130,8 @@ class _ShellPantallaState extends State<ShellPantalla> {
     );
   }
 }
+
+// ── Header ──────────────────────────────────────────────────────────────────
 
 class _BarraSuperior extends StatelessWidget {
   const _BarraSuperior({required this.estado});
@@ -122,12 +141,7 @@ class _BarraSuperior extends StatelessWidget {
   Widget build(BuildContext context) {
     final u = estado.usuario!;
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-            bottom: BorderSide(
-                color: TemaModernista.divisor,
-                width: TemaModernista.reglaFuerte)),
-      ),
+      color: TemaModernista.fondoOscuro,
       padding: const EdgeInsets.symmetric(
           horizontal: TemaModernista.esp4, vertical: TemaModernista.esp3),
       child: Row(
@@ -138,7 +152,7 @@ class _BarraSuperior extends StatelessWidget {
             color: TemaModernista.acento,
             alignment: Alignment.center,
             child: Text('M',
-                style: TemaModernista.titulo(16).copyWith(color: Colors.white)),
+                style: TemaModernista.titulo(16, color: Colors.white)),
           ),
           const SizedBox(width: TemaModernista.esp3),
           Expanded(
@@ -146,27 +160,108 @@ class _BarraSuperior extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(estado.nombreClub.toUpperCase(),
-                    style: TemaModernista.titulo(15)),
+                    style:
+                        TemaModernista.titulo(15, color: Colors.white)),
                 Text(estado.categoria.toUpperCase(),
                     style: TemaModernista.etiqueta(
-                        color: TemaModernista.neutral800, tam: 9)),
+                        color: TemaModernista.neutral400, tam: 9)),
               ],
             ),
           ),
           OutlinedButton(
             onPressed: estado.salir,
             style: OutlinedButton.styleFrom(
-              shape:
-                  const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero),
               side: const BorderSide(color: TemaModernista.neutral400),
               padding: const EdgeInsets.symmetric(
                   horizontal: TemaModernista.esp2, vertical: 4),
               minimumSize: Size.zero,
+              foregroundColor: Colors.white,
             ),
             child: Text('${u.rolCorto} · SALIR',
-                style: TemaModernista.etiqueta(tam: 9)),
+                style:
+                    TemaModernista.etiqueta(color: Colors.white, tam: 9)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Nav inferior ─────────────────────────────────────────────────────────────
+
+/// Ítem individual con transiciones de color fluidas sobre fondo oscuro.
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.destino,
+    required this.seleccionado,
+    required this.onTap,
+  });
+  final Destino destino;
+  final bool seleccionado;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        splashColor: TemaModernista.acento.withOpacity(0.15),
+        highlightColor: TemaModernista.acento.withOpacity(0.08),
+        child: Stack(
+          children: [
+            // Indicador rojo superior — aparece animado
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                height: 3,
+                color: seleccionado
+                    ? TemaModernista.acento
+                    : Colors.transparent,
+              ),
+            ),
+            // Ícono + etiqueta
+            Padding(
+              padding: const EdgeInsets.only(top: 9, bottom: 11),
+              child: Column(
+                children: [
+                  TweenAnimationBuilder<Color?>(
+                    tween: ColorTween(
+                      end: seleccionado
+                          ? TemaModernista.acento
+                          : TemaModernista.neutral400,
+                    ),
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                    builder: (_, color, __) => Icon(
+                      destino.icono,
+                      size: 21,
+                      color: color ??
+                          (seleccionado
+                              ? TemaModernista.acento
+                              : TemaModernista.neutral400),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                    style: TemaModernista.etiqueta(
+                      color: seleccionado
+                          ? TemaModernista.acento
+                          : TemaModernista.neutral400,
+                      tam: 8.5,
+                    ),
+                    child: Text(destino.etiqueta.toUpperCase()),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -180,50 +275,22 @@ class _NavInferior extends StatelessWidget {
   final ValueChanged<int> onCambiar;
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          for (var i = 0; i < destinos.length; i++)
-            Expanded(
-              child: InkWell(
+  Widget build(BuildContext context) => Container(
+        color: TemaModernista.fondoOscuro,
+        child: Row(
+          children: [
+            for (var i = 0; i < destinos.length; i++)
+              _NavItem(
+                destino: destinos[i],
+                seleccionado: i == indice,
                 onTap: () => onCambiar(i),
-                child: Stack(
-                  children: [
-                    if (i == indice)
-                      Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                              height: 3, color: TemaModernista.acento)),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 9, bottom: 11),
-                      child: Column(
-                        children: [
-                          Icon(destinos[i].icono,
-                              size: 21,
-                              color: i == indice
-                                  ? TemaModernista.acento
-                                  : TemaModernista.neutral400),
-                          const SizedBox(height: 4),
-                          Text(
-                            destinos[i].etiqueta.toUpperCase(),
-                            style: TemaModernista.etiqueta(
-                              color: i == indice
-                                  ? TemaModernista.acento
-                                  : TemaModernista.neutral400,
-                              tam: 8.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ),
-        ],
+          ],
+        ),
       );
 }
+
+// ── Aviso ────────────────────────────────────────────────────────────────────
 
 class _Aviso extends StatelessWidget {
   const _Aviso({required this.texto});
