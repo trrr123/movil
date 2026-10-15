@@ -28,9 +28,12 @@ class _ConvocatoriaPantallaState extends State<ConvocatoriaPantalla> {
       );
     }
 
-    final sesion = widget.sesion ?? estado.sesiones.first;
+    // Una escuela nueva puede no tener aún entrenos o partidos programados.
+    final sesion = widget.sesion ?? estado.sesiones.firstOrNull;
     final conv = estado.convocatoria;
-    final total = _modoAsistencia ? sesion.presentes : conv.total;
+    final partido = estado.partidoActual;
+    final sinDatos = _modoAsistencia ? sesion == null : (conv == null || partido == null);
+    final total = _modoAsistencia ? (sesion?.presentes ?? 0) : (conv?.total ?? 0);
 
     return Scaffold(
       appBar: AppBar(
@@ -42,8 +45,12 @@ class _ConvocatoriaPantallaState extends State<ConvocatoriaPantalla> {
         children: [
           Text(
             _modoAsistencia
-                ? '${sesion.titulo} · ${sesion.fecha.day}/${sesion.fecha.month}'
-                : 'Sáb 19 sep · vs. ${estado.partidoActual.rival}',
+                ? (sesion == null
+                    ? 'Sin entrenos programados'
+                    : '${sesion.titulo} · ${sesion.fecha.day}/${sesion.fecha.month}')
+                : (partido == null
+                    ? 'Sin partidos programados'
+                    : '${partido.fecha.day}/${partido.fecha.month} · vs. ${partido.rival}'),
             style: TemaModernista.cuerpo(tam: 11, color: TemaModernista.neutral400),
           ),
           const SizedBox(height: TemaModernista.esp3),
@@ -60,80 +67,91 @@ class _ConvocatoriaPantallaState extends State<ConvocatoriaPantalla> {
           ),
           const SizedBox(height: TemaModernista.esp3),
           const Regla(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              children: [
-                Text('$total', style: TemaModernista.titulo(24).copyWith(color: TemaModernista.acento)),
-                const SizedBox(width: TemaModernista.esp3),
-                Expanded(
-                  child: Text(
-                    _modoAsistencia
-                        ? 'presentes de ${estado.plantel.length} en el entreno'
-                        : 'convocados de ${estado.plantel.length} · máximo ${conv.tope}',
-                    style: TemaModernista.cuerpo(tam: 11, color: TemaModernista.neutral800),
+          if (sinDatos)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: TemaModernista.esp5),
+              child: Text(
+                _modoAsistencia
+                    ? 'Todavía no hay entrenos en la agenda para tomar asistencia.'
+                    : 'Todavía no hay un partido programado para convocar.',
+                style: TemaModernista.cuerpo(tam: 13, color: TemaModernista.neutral800),
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Text('$total', style: TemaModernista.titulo(24).copyWith(color: TemaModernista.acento)),
+                  const SizedBox(width: TemaModernista.esp3),
+                  Expanded(
+                    child: Text(
+                      _modoAsistencia
+                          ? 'presentes de ${estado.plantel.length} en el entreno'
+                          : 'convocados de ${estado.plantel.length} · máximo ${conv?.tope ?? 0}',
+                      style: TemaModernista.cuerpo(tam: 11, color: TemaModernista.neutral800),
+                    ),
                   ),
-                ),
-                BotonModernista(
-                  _modoAsistencia ? 'Cerrar' : 'Enviar',
-                  expandido: false,
-                  onTap: () {
-                    if (_modoAsistencia) {
-                      estado.avisar('Asistencia registrada');
-                    } else {
-                      estado.enviarConvocatoria();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          const Regla(),
-          for (final j in estado.plantel)
-            InkWell(
-              onTap: () => setState(() {
-                if (_modoAsistencia) {
-                  estado.marcarAsistencia(sesion, j, !sesion.asistio(j.id));
-                } else {
-                  estado.alternarConvocado(j);
-                }
-              }),
-              child: Container(
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: TemaModernista.neutral300)),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: (_modoAsistencia ? sesion.asistio(j.id) : conv.incluye(j.id))
-                            ? TemaModernista.acento
-                            : Colors.transparent,
-                        border: const Border.fromBorderSide(BorderSide(color: TemaModernista.divisor, width: 2)),
-                      ),
-                      alignment: Alignment.center,
-                      child: (_modoAsistencia ? sesion.asistio(j.id) : conv.incluye(j.id))
-                          ? const Icon(Icons.check, size: 14, color: Colors.white)
-                          : null,
-                    ),
-                    const SizedBox(width: TemaModernista.esp3),
-                    SizedBox(
-                      width: 26,
-                      child: Text('${j.dorsal}',
-                          textAlign: TextAlign.right,
-                          style: TemaModernista.titulo(15).copyWith(color: TemaModernista.neutral800)),
-                    ),
-                    const SizedBox(width: TemaModernista.esp2),
-                    Expanded(child: Text(j.nombre, style: TemaModernista.cuerpo())),
-                    Text(j.posicion.sigla,
-                        style: TemaModernista.etiqueta(color: TemaModernista.neutral400, tam: 9)),
-                  ],
-                ),
+                  BotonModernista(
+                    _modoAsistencia ? 'Cerrar' : 'Enviar',
+                    expandido: false,
+                    onTap: () {
+                      if (_modoAsistencia) {
+                        estado.avisar('Asistencia registrada');
+                      } else {
+                        estado.enviarConvocatoria();
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
+            const Regla(),
+            for (final j in estado.plantel)
+              InkWell(
+                onTap: () => setState(() {
+                  if (_modoAsistencia) {
+                    estado.marcarAsistencia(sesion!, j, !sesion.asistio(j.id));
+                  } else {
+                    estado.alternarConvocado(j);
+                  }
+                }),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: TemaModernista.neutral300)),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: (_modoAsistencia ? sesion!.asistio(j.id) : conv!.incluye(j.id))
+                              ? TemaModernista.acento
+                              : Colors.transparent,
+                          border: const Border.fromBorderSide(BorderSide(color: TemaModernista.divisor, width: 2)),
+                        ),
+                        alignment: Alignment.center,
+                        child: (_modoAsistencia ? sesion!.asistio(j.id) : conv!.incluye(j.id))
+                            ? const Icon(Icons.check, size: 14, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: TemaModernista.esp3),
+                      SizedBox(
+                        width: 26,
+                        child: Text('${j.dorsal}',
+                            textAlign: TextAlign.right,
+                            style: TemaModernista.titulo(15).copyWith(color: TemaModernista.neutral800)),
+                      ),
+                      const SizedBox(width: TemaModernista.esp2),
+                      Expanded(child: Text(j.nombre, style: TemaModernista.cuerpo())),
+                      Text(j.posicion.sigla, style: TemaModernista.etiqueta(color: TemaModernista.neutral400, tam: 9)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

@@ -74,10 +74,15 @@ class Alineacion implements Exportable {
     required List<Jugador> once,
     required this.creada,
     this.publicada = false,
+    List<PuntoCampo>? puntos,
   })  : _formacion = formacion,
         _fichas = List.generate(
           once.length,
-          (i) => FichaCampo(jugador: once[i], punto: formacion.puntos[i]),
+          (i) => FichaCampo(
+            jugador: once[i],
+            // Posiciones guardadas (si las hay); si no, las de la formación.
+            punto: puntos != null && i < puntos.length ? puntos[i] : formacion.puntos[i],
+          ),
         );
 
   final int id;
@@ -114,11 +119,15 @@ class Alineacion implements Exportable {
     _fichas[i] = FichaCampo(jugador: entra, punto: punto);
   }
 
+  List<PuntoCampo> get puntos => _fichas.map((f) => f.punto).toList();
+
+  /// Copia independiente (mover fichas en la copia no toca el original).
   Alineacion duplicar({required int nuevoId, required String nuevoNombre}) => Alineacion(
         id: nuevoId,
         nombre: nuevoNombre,
         formacion: _formacion,
         once: titulares,
+        puntos: puntos,
         creada: DateTime.now(),
       );
 

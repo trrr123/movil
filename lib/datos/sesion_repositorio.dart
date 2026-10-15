@@ -1,14 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../modelos/partido.dart';
+import 'escuela_activa.dart';
 
 /// Fuente de datos de entrenamientos y charlas (comparten la agenda con los
 /// partidos, pero se guardan y persisten aparte).
 abstract class SesionRepositorio {
   Future<List<SesionEntrenamiento>> cargarSesiones();
+  Future<void> crear(SesionEntrenamiento sesion);
+
+  /// Guarda la planilla completa de asistencia de la sesión.
+  Future<void> guardarAsistencia(SesionEntrenamiento sesion);
 }
 
 class SesionRepositorioDemo implements SesionRepositorio {
+  @override
+  Future<void> crear(SesionEntrenamiento sesion) async {}
+
+  @override
+  Future<void> guardarAsistencia(SesionEntrenamiento sesion) async {}
+
   @override
   Future<List<SesionEntrenamiento>> cargarSesiones() async => [
         SesionEntrenamiento(
@@ -28,13 +39,13 @@ class SesionRepositorioDemo implements SesionRepositorio {
 }
 
 class SesionRepositorioFirestore implements SesionRepositorio {
-  SesionRepositorioFirestore({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+  SesionRepositorioFirestore(this._escuela);
 
-  final FirebaseFirestore _db;
+  final EscuelaActiva _escuela;
 
   @override
   Future<List<SesionEntrenamiento>> cargarSesiones() async {
-    final snap = await _db.collection('sesiones').orderBy('fecha').get();
+    final snap = await _escuela.coleccion('sesiones').orderBy('fecha').get();
     return snap.docs.map((doc) {
       final d = doc.data();
       final sesion = SesionEntrenamiento(
@@ -51,4 +62,19 @@ class SesionRepositorioFirestore implements SesionRepositorio {
       return sesion;
     }).toList();
   }
+
+  @override
+  Future<void> crear(SesionEntrenamiento s) => _escuela.coleccion('sesiones').doc('${s.id}').set({
+        'id': s.id,
+        'titulo': s.titulo,
+        'fecha': Timestamp.fromDate(s.fecha),
+        'lugar': s.lugar,
+        'tipo': s.tipo.name,
+        'asistencia': <String, bool>{},
+      });
+
+  @override
+  Future<void> guardarAsistencia(SesionEntrenamiento s) => _escuela.coleccion('sesiones').doc('${s.id}').update({
+        'asistencia': {for (final e in s.asistencia.entries) '${e.key}': e.value},
+      });
 }

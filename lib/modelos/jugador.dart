@@ -89,13 +89,15 @@ class Jugador {
 
   void cambiarEstado(EstadoFisico nuevo) => _estado = nuevo;
 
-  void registrarPartido({int minutos = 0, int goles = 0, int asistencias = 0, int amarillas = 0}) {
+  /// Suma lo hecho en un partido. [jugo] cuenta un partido jugado (por
+  /// defecto, si sumó minutos): un suplente que entra al final igual lo jugó.
+  void registrarPartido({int minutos = 0, int goles = 0, int asistencias = 0, int amarillas = 0, bool? jugo}) {
     _estadisticas = _estadisticas.sumar(
       minutos: minutos,
       goles: goles,
       asistencias: asistencias,
       amarillas: amarillas,
-      jugo: minutos > 0,
+      jugo: jugo ?? minutos > 0,
     );
   }
 

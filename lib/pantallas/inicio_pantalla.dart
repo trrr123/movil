@@ -52,6 +52,9 @@ class InicioPantalla extends StatelessWidget {
         const SizedBox(height: TemaModernista.esp4),
 
         // ── Tarjeta del próximo partido (oscura) ───────────────────────────
+        if (p == null)
+          const _SinPartido()
+        else
         Container(
           color: TemaModernista.fondoOscuro,
           padding: const EdgeInsets.all(TemaModernista.esp4),
@@ -61,7 +64,7 @@ class InicioPantalla extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Kicker('Próximo partido',
+                  const Kicker('Próximo partido',
                       color: TemaModernista.neutral400),
                   Etiqueta('Fecha ${p.id}',
                       fondo: TemaModernista.acento,
@@ -75,7 +78,7 @@ class InicioPantalla extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('MAKUIRA',
+                        Text(estado.nombreClub.toUpperCase(),
                             style:
                                 TemaModernista.titulo(20, color: Colors.white)),
                         Text(p.local ? 'LOCAL' : 'VISITANTE',
@@ -118,7 +121,7 @@ class InicioPantalla extends StatelessWidget {
         ),
 
         // ── Botones del partido (sobre fondo blanco) ───────────────────────
-        if (esDT) ...[
+        if (esDT && p != null) ...[
           const SizedBox(height: TemaModernista.esp3),
           Row(
             children: [
@@ -130,14 +133,11 @@ class InicioPantalla extends StatelessWidget {
               ),
               const SizedBox(width: TemaModernista.esp2),
               Expanded(
-                child: BotonModernista('En vivo',
+                child: BotonModernista(p.programado ? 'Partido' : 'En vivo',
                     variante: VarianteBoton.secundario,
-                    onTap: () {
-                      estado.iniciarPartido();
-                      Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const EnVivoPantalla()));
-                    }),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => EnVivoPantalla(partido: p)))),
               ),
             ],
           ),
@@ -147,10 +147,10 @@ class InicioPantalla extends StatelessWidget {
 
         // ── Estadísticas / Citación propia ─────────────────────────────────
         if (esDT)
-          GrillaCifras(celdas: const [
-            CeldaCifra(valor: '28', rotulo: 'Puntos'),
-            CeldaCifra(valor: '14', rotulo: 'Jugados'),
-            CeldaCifra(valor: '+12', rotulo: 'Diferencia',
+          GrillaCifras(celdas: [
+            CeldaCifra(valor: '${estado.plantel.length}', rotulo: 'Jugadores'),
+            CeldaCifra(valor: '${estado.partidos.length}', rotulo: 'Partidos'),
+            CeldaCifra(valor: '${estado.lesionados}', rotulo: 'Lesionados',
                 color: TemaModernista.acento),
           ])
         else
@@ -239,6 +239,7 @@ class _CitacionPropia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hayPartido = estado.partidoActual != null;
     final convocado = estado.estoyConvocado();
     final titular   = estado.soyTitular();
     final f         = estado.miFicha!;
@@ -251,18 +252,22 @@ class _CitacionPropia extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Kicker('Tu citación', color: TemaModernista.neutral400),
+              const Kicker('Tu citación', color: TemaModernista.neutral400),
               Text(
-                convocado
-                    ? (titular ? 'CONVOCADO — TITULAR' : 'CONVOCADO — BANCA')
-                    : 'NO CONVOCADO',
+                !hayPartido
+                    ? 'SIN PARTIDO PROGRAMADO'
+                    : convocado
+                        ? (titular ? 'CONVOCADO — TITULAR' : 'CONVOCADO — BANCA')
+                        : 'NO CONVOCADO',
                 style: TemaModernista.titulo(22, color: Colors.white),
               ),
               const SizedBox(height: 8),
               Text(
-                convocado
-                    ? 'Presentarse 1:45 pm en la sede. Uniforme rojo.'
-                    : 'Esta fecha descansás. Entrenos siguen normales.',
+                !hayPartido
+                    ? 'Cuando el profe programe un partido, aquí verás tu citación.'
+                    : convocado
+                        ? 'Revisa la hora y la sede del partido en la Agenda.'
+                        : 'Esta fecha descansas. Los entrenos siguen normales.',
                 style: TemaModernista.cuerpo(
                     tam: 12, color: TemaModernista.neutral400),
               ),
@@ -279,4 +284,26 @@ class _CitacionPropia extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Tarjeta oscura cuando la escuela aún no tiene partidos en la agenda.
+class _SinPartido extends StatelessWidget {
+  const _SinPartido();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        color: TemaModernista.fondoOscuro,
+        padding: const EdgeInsets.all(TemaModernista.esp4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Kicker('Próximo partido', color: TemaModernista.neutral400),
+            Text('SIN PARTIDOS PROGRAMADOS', style: TemaModernista.titulo(20, color: Colors.white)),
+            const SizedBox(height: TemaModernista.esp2),
+            Text('Aún no hay partidos en la agenda de la escuela.',
+                style: TemaModernista.cuerpo(tam: 12, color: TemaModernista.neutral400)),
+          ],
+        ),
+      );
 }

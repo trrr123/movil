@@ -207,8 +207,8 @@ class _NavItem extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        splashColor: TemaModernista.acento.withOpacity(0.15),
-        highlightColor: TemaModernista.acento.withOpacity(0.08),
+        splashColor: TemaModernista.acento.withValues(alpha: 0.15),
+        highlightColor: TemaModernista.acento.withValues(alpha: 0.08),
         child: Stack(
           children: [
             // Indicador rojo superior — aparece animado

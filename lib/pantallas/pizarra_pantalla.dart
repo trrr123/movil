@@ -207,7 +207,7 @@ class PizarraPantalla extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Kicker('Descargar', color: TemaModernista.acento),
+                  const Kicker('Descargar', color: TemaModernista.acento),
                   Text('Alineación ${estado.alineacion.formacion.nombre}', style: TemaModernista.titulo(20)),
                 ],
               ),

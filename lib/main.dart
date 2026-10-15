@@ -5,10 +5,16 @@ import 'core/tema_modernista.dart';
 import 'datos/repositorios.dart';
 import 'estado/app_estado.dart';
 import 'firebase_options.dart';
+import 'modelos/usuario.dart';
+import 'pantallas/admin_pantalla.dart';
+import 'pantallas/elegir_rol_pantalla.dart';
+import 'pantallas/familia_pantalla.dart';
 import 'pantallas/login_pantalla.dart';
+import 'pantallas/profesor_pantalla.dart';
 import 'pantallas/shell_pantalla.dart';
 import 'pantallas/splash_pantalla.dart';
 import 'servicios/auth_servicio.dart';
+import 'servicios/correo_servicio.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +23,12 @@ Future<void> main() async {
 }
 
 class AppMakuira extends StatefulWidget {
-  const AppMakuira({super.key, this.auth, this.repositorios});
+  const AppMakuira({super.key, this.auth, this.repositorios, this.correo});
 
   /// Permite inyectar servicios demo en los tests, sin pasar por Firebase.
   final AuthServicio? auth;
   final Repositorios? repositorios;
+  final CorreoServicio? correo;
 
   @override
   State<AppMakuira> createState() => _AppMakuiraState();
@@ -31,12 +38,14 @@ class _AppMakuiraState extends State<AppMakuira> {
   late final AppEstado _estado = AppEstado(
     auth: widget.auth ?? AuthFirebase(),
     repositorios: widget.repositorios ?? Repositorios.firestore(),
+    // Con servicios inyectados (tests) no se manda correo real.
+    correo: widget.correo ?? (widget.auth == null ? const CorreoEmailJs() : const CorreoNulo()),
   );
 
   @override
   void initState() {
     super.initState();
-    _estado.cargarClub();
+    _estado.iniciar();
   }
 
   @override
@@ -59,7 +68,8 @@ class _AppMakuiraState extends State<AppMakuira> {
   }
 }
 
-/// Decide qué ve el usuario: animación de entrada → login → app por rol.
+/// Decide qué ve el usuario: animación de entrada → login → pantalla del rol.
+/// Cada subclase de [Usuario] tiene su destino (polimorfismo en la puerta).
 class _Puerta extends StatefulWidget {
   const _Puerta();
 
@@ -76,22 +86,28 @@ class _PuertaState extends State<_Puerta> {
       return SplashPantalla(onTerminar: () => setState(() => _intro = false));
     }
     final estado = AlcanceApp.de(context);
-    if (estado.cargandoClub) return const _CargandoPantalla();
-    if (!estado.autenticado) return const LoginPantalla();
+    if (estado.iniciando) return const _CargandoPantalla();
     if (estado.cargandoDatos) return const _CargandoPantalla();
-    return const ShellPantalla();
+    return switch (estado.usuario) {
+      null => const LoginPantalla(),
+      UsuarioNuevo() => const ElegirRolPantalla(),
+      Administrador() => const AdminPantalla(),
+      ProfesorSolicitante() => const ProfesorPantalla(),
+      Familia() => const FamiliaPantalla(),
+      _ => const ShellPantalla(),
+    };
   }
 }
 
-/// Se ve mientras se trae el club (antes de login) o el resto de los datos
-/// (justo después de un login exitoso) — en la práctica, un instante.
+/// Se ve mientras se restaura la sesión o se traen los datos de la escuela
+/// (justo después de entrar) — en la práctica, un instante.
 class _CargandoPantalla extends StatelessWidget {
   const _CargandoPantalla();
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => const Scaffold(
         backgroundColor: TemaModernista.fondo,
-        body: const Center(
+        body: Center(
           child: CircularProgressIndicator(color: TemaModernista.acento),
         ),
       );

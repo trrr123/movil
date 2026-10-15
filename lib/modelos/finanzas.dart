@@ -35,8 +35,10 @@ class Cuota {
 
 /// Caja del mes: agrega cuotas y calcula el recaudo (composición).
 class CajaMensual {
-  CajaMensual({required this.periodo, required List<Cuota> cuotas}) : _cuotas = cuotas;
+  CajaMensual({required this.periodo, required List<Cuota> cuotas, this.id = ''}) : _cuotas = cuotas;
 
+  /// Id del mes en la base de datos ("2026-10"); vacío si aún no hay caja.
+  final String id;
   final String periodo;
   final List<Cuota> _cuotas;
 
@@ -46,7 +48,8 @@ class CajaMensual {
   int get pendientes => _cuotas.where((c) => !c.alDia).length;
   double get avance => meta == 0 ? 0 : recaudado / meta;
 
-  Cuota deJugador(int jugadorId) => _cuotas.firstWhere((c) => c.jugadorId == jugadorId);
+  /// Cuota del mes de un jugador; null si todavía no tiene (ej. recién inscrito).
+  Cuota? deJugador(int jugadorId) => _cuotas.where((c) => c.jugadorId == jugadorId).firstOrNull;
 
   String get recaudadoFormateado => formatearPesos(recaudado);
   String get metaFormateada => formatearPesos(meta);
@@ -64,12 +67,14 @@ class CajaMensual {
 
 /// Convocatoria de un partido: lista cerrada con tope reglamentario.
 class Convocatoria {
-  Convocatoria({required this.partidoId, this.tope = 18});
+  Convocatoria({required this.partidoId, this.tope = 18, Iterable<int> llamados = const [], bool enviada = false})
+      : _llamados = {...llamados},
+        _enviada = enviada;
 
   final int partidoId;
   final int tope;
-  final Set<int> _llamados = {};
-  bool _enviada = false;
+  final Set<int> _llamados;
+  bool _enviada;
 
   Set<int> get llamados => Set.unmodifiable(_llamados);
   int get total => _llamados.length;
@@ -89,4 +94,20 @@ class Convocatoria {
   }
 
   void enviar() => _enviada = true;
+}
+
+/// Mes de cobro: id ordenable ("2026-10") y nombre legible ("Octubre 2026").
+class MesCobro {
+  const MesCobro(this.id, this.nombre);
+
+  factory MesCobro.de(DateTime f) {
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    ];
+    return MesCobro('${f.year}-${f.month.toString().padLeft(2, '0')}', '${meses[f.month - 1]} ${f.year}');
+  }
+
+  final String id;
+  final String nombre;
 }

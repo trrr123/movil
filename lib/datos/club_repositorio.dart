@@ -1,7 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'escuela_activa.dart';
 
-/// Datos públicos del club (nombre, categoría): los únicos legibles sin
-/// sesión, para que la pantalla de login los muestre antes de cualquier login.
+/// Nombre y categoría de la escuela activa, para la barra superior.
 abstract class ClubRepositorio {
   Future<({String nombreClub, String categoria})> cargar();
 }
@@ -13,16 +12,16 @@ class ClubRepositorioDemo implements ClubRepositorio {
 }
 
 class ClubRepositorioFirestore implements ClubRepositorio {
-  ClubRepositorioFirestore({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+  ClubRepositorioFirestore(this._escuela);
 
-  final FirebaseFirestore _db;
+  final EscuelaActiva _escuela;
 
   @override
   Future<({String nombreClub, String categoria})> cargar() async {
-    final doc = await _db.collection('club').doc('config').get();
+    final doc = await _escuela.documento.get();
     final d = doc.data() ?? const <String, dynamic>{};
     return (
-      nombreClub: d['nombreClub'] as String? ?? 'Club',
+      nombreClub: d['nombre'] as String? ?? 'Escuela',
       categoria: d['categoria'] as String? ?? '',
     );
   }

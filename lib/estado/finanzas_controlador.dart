@@ -20,13 +20,22 @@ class FinanzasControlador extends ChangeNotifier {
     notifyListeners();
   }
 
-  void confirmarPago(Cuota c) {
+  Future<void> confirmarPago(Cuota c) async {
     c.confirmarPago();
     notifyListeners();
+    await _repo.guardarEstado(_caja.id, c);
   }
 
-  void reportarPago(Cuota c) {
+  Future<void> reportarPago(Cuota c) async {
     c.reportarPago();
     notifyListeners();
+    await _repo.guardarEstado(_caja.id, c);
+  }
+
+  /// Cobro del mes [mes] para [jugadores] (los que aún no tienen cuota).
+  Future<void> crearCuotas(MesCobro mes,
+      {required int monto, required List<Jugador> jugadores, required List<Jugador> plantel}) async {
+    await _repo.crearCuotas(mes, monto: monto, jugadores: jugadores);
+    await cargar(plantel);
   }
 }

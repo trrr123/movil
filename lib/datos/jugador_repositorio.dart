@@ -1,15 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../modelos/jugador.dart';
+import 'escuela_activa.dart';
 
 /// Fuente de datos del plantel. Separado del resto de entidades del club
 /// para que agregar persistencia o cambiar el mapeo de un jugador no
 /// obligue a tocar partidos, sesiones, caja o alineaciones.
 abstract class JugadorRepositorio {
   Future<List<Jugador>> cargarPlantel();
+
+  /// Guarda las estadísticas acumuladas (tras un partido) de [jugadores].
+  Future<void> guardarEstadisticas(Iterable<Jugador> jugadores);
+
+  /// Guarda el estado físico (apto, carga alta, lesionado).
+  Future<void> guardarEstadoFisico(Jugador jugador);
 }
 
 class JugadorRepositorioDemo implements JugadorRepositorio {
+  @override
+  Future<void> guardarEstadisticas(Iterable<Jugador> jugadores) async {}
+
+  @override
+  Future<void> guardarEstadoFisico(Jugador jugador) async {}
+
   @override
   Future<List<Jugador>> cargarPlantel() async => [
         _j(1, 1, 'A. Barrios', Posicion.portero, 'Portero', 19, 'Derecho', 1260, 0, 0),
@@ -75,13 +88,13 @@ class JugadorRepositorioDemo implements JugadorRepositorio {
 /// Lee el plantel real de Firestore (colección `jugadores`, la que escribe
 /// `tool/seed_firestore.mjs`).
 class JugadorRepositorioFirestore implements JugadorRepositorio {
-  JugadorRepositorioFirestore({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+  JugadorRepositorioFirestore(this._escuela);
 
-  final FirebaseFirestore _db;
+  final EscuelaActiva _escuela;
 
   @override
   Future<List<Jugador>> cargarPlantel() async {
-    final snap = await _db.collection('jugadores').orderBy('id').get();
+    final snap = await _escuela.coleccion('jugadores').orderBy('id').get();
     return snap.docs.map(_jugadorDesde).toList();
   }
 
@@ -108,4 +121,26 @@ class JugadorRepositorioFirestore implements JugadorRepositorio {
       ),
     );
   }
+
+  @override
+  Future<void> guardarEstadisticas(Iterable<Jugador> jugadores) async {
+    final lote = _escuela.db.batch();
+    for (final j in jugadores) {
+      final e = j.estadisticas;
+      lote.update(_escuela.coleccion('jugadores').doc('${j.id}'), {
+        'estadisticas': {
+          'partidos': e.partidos,
+          'minutos': e.minutos,
+          'goles': e.goles,
+          'asistencias': e.asistencias,
+          'amarillas': e.amarillas,
+        },
+      });
+    }
+    await lote.commit();
+  }
+
+  @override
+  Future<void> guardarEstadoFisico(Jugador j) =>
+      _escuela.coleccion('jugadores').doc('${j.id}').update({'estado': j.estado.name});
 }

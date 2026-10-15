@@ -138,12 +138,7 @@ class FichaPantalla extends StatelessWidget {
               Expanded(
                 child: BotonModernista('Cambiar estado',
                     variante: VarianteBoton.secundario,
-                    onTap: () {
-                      final siguiente = EstadoFisico
-                          .values[(EstadoFisico.values.indexOf(j.estado) + 1) % EstadoFisico.values.length];
-                      j.cambiarEstado(siguiente);
-                      estado.avisar('${j.apellido}: ${siguiente.etiqueta}');
-                    }),
+                    onTap: () => estado.cambiarEstadoFisico(j)),
               ),
             ],
           ),
