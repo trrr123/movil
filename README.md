@@ -15,12 +15,71 @@ flutter run
 La fuente Archivo (variable, cubre los pesos 400/600/800) ya está incluida en
 `assets/fonts/` y declarada en `pubspec.yaml`.
 
-Cuentas de la demo (clave `1234` en las dos):
+Cuentas de la demo, solo en los tests (`AuthEnMemoria`, clave `1234`):
 
 | Correo | Rol |
 | --- | --- |
 | `dt@makuira.co` | Director técnico — ve y edita todo |
 | `zuniga@makuira.co` | Jugador — solo lo suyo |
+
+## Registro y roles
+
+La app es multi-escuela: cada escuela guarda sus datos en `escuelas/{id}/…`.
+
+| Rol (`usuarios/{uid}.rol`) | Cómo se llega | Qué ve |
+| --- | --- | --- |
+| `profesor` | Se registra y elige "Soy profesor" | Formulario de su escuela → código `MK-XXXXXX` + WhatsApp |
+| `dt` | El admin aprueba su escuela | La app del club (plantel, táctica, agenda, caja, inscripciones) |
+| `acudiente` | Se registra y elige "Soy padre" | Sus hijos (goles, asistencias, entrenos, deuda) o el catálogo de escuelas |
+| `estudiante` | Se registra y elige "Soy estudiante" | Catálogo de escuelas; al ser aceptado, entra como jugador |
+| `admin` | **A mano** en la consola de Firebase | Solicitudes de escuelas para aprobar/rechazar |
+
+Las reglas (`firestore.rules`) impiden que una cuenta se dé `dt` o `admin` sola.
+
+### Lo que el DT guarda en la base de datos
+
+| Acción | Dónde | Lo ven |
+| --- | --- | --- |
+| Programar partido / entreno (Agenda → *+ Programar*) | `partidos`, `sesiones` | Todos |
+| Marcar asistencia de un entreno | `sesiones/{id}.asistencia` | Acudiente (asistencia a entrenos) |
+| Finalizar partido (goles con asistente, tarjetas, cambios) | `partidos/{id}` + `jugadores/{id}.estadisticas` | Jugador y acudiente |
+| Crear cuotas del mes (Club) y confirmar pagos | `caja/{AAAA-MM}/cuotas` | Acudiente (lo que debe) |
+
+El reloj del partido corre en tiempo real (1 minuto por minuto) y se pausa en el entretiempo.
+Cada jugada se guarda al momento: si la app se cierra a mitad del partido, al volver queda en
+pausa con su acta y su minuto (corregible con −1′ / +1′). Las estadísticas se suman al finalizar.
+
+### Pruebas
+
+```bash
+flutter test
+```
+
+Las reglas de seguridad se prueban contra el emulador local de Firestore (base temporal, no toca
+la real). Necesita Java (sirve el de Android Studio, en `JAVA_HOME`):
+
+```bash
+cd tool/pruebas_reglas && npm install
+firebase emulators:exec --only firestore --project demo-makuira --config ../../firebase.json "npm test"
+```
+
+### Configuración pendiente en Firebase
+
+1. **Admin:** regístrate en la app con la cuenta que será admin (elige cualquier rol) y corre
+   `node tool/hacer_admin.mjs tu@correo.com`. Cierra sesión y vuelve a entrar. Usa una cuenta
+   distinta a la de cualquier profesor: al aprobar una escuela, su dueño pasa a ser `dt`.
+2. **Google Sign-In:** *Authentication → Sign-in method → Google → Habilitar*. Luego en
+   *Configuración del proyecto → Tu app Android → Agregar huella digital* pega el SHA-1 de debug
+   (`keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android`)
+   y vuelve a descargar `google-services.json` a `android/app/`.
+3. **Reglas:** `firebase deploy --only firestore:rules`.
+4. **Correo de bienvenida** (gratis, EmailJS): al terminar el registro la app manda un solo
+   correo, igual para todos. La plantilla está en `tool/correo_bienvenida.html` (variables
+   `{{nombre}}`, `{{correo}}`, `{{rol}}`) y los ids van en `lib/core/config_correo.dart`.
+   En EmailJS hay que activar *Account → Security → Allow EmailJS API for non-browser applications*.
+
+Las fotos se guardan comprimidas en Firestore (`fotos/{id}`) para no depender de Storage; el mapa
+es OpenStreetMap (`flutter_map`), sin clave de API.
 
 ## POO: cómo está organizado
 

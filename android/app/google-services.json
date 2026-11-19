@@ -12,7 +12,20 @@
           "package_name": "com.example.makuira_gestion"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "503890321319-lbnihc4fonanj12t83201j3bnau3ult3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.makuira_gestion",
+            "certificate_hash": "26eb022ee6ff60be4028505dc1756c0db727b9e9"
+          }
+        },
+        {
+          "client_id": "503890321319-ot7nkdakq79a6soap6to574eknkpu2da.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDa-8W2BmlFwGKi9G9Fon6S6zThzB8h5mY"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "503890321319-ot7nkdakq79a6soap6to574eknkpu2da.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

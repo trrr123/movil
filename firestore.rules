@@ -1,15 +1,24 @@
 rules_version = '2';
 
-// Modelo de permisos (replica el de AppEstado/Usuario en Dart):
-// - DT: lee y escribe todo.
-// - Jugador: lee plantel/agenda/alineaciones, solo escribe su propia cuota
-//   (reportar pago) y su propia asistencia no aplica (la marca el DT).
+// Modelo de permisos (replica el de Usuario/AppEstado en Dart):
 //
-// Limitación conocida: Firestore no filtra campos dentro de un documento,
-// así que un jugador autenticado que lea `jugadores/{id}` directo (no vía
-// la UI) puede ver minutos/goles/estado médico de sus compañeros aunque la
-// app se los oculte. Resolverlo bien requeriría duplicar datos en una
-// colección pública reducida o una Cloud Function — queda pendiente.
+// - admin:      dueño de la app. Aprueba o rechaza escuelas; al aprobar,
+//               convierte al profesor en 'dt' de esa escuela.
+// - profesor:   se registró y mandó (o va a mandar) su escuela a revisión.
+// - dt:         profesor aprobado. Lee y escribe todo lo de SU escuela
+//               (escuelas/{suEscuelaId}/...), y acepta inscripciones.
+// - acudiente / estudiante: piden cupo (inscripciones). Cuando el DT acepta,
+//               quedan como miembros (escuelas/{id}/miembros/{uid}) y eso les
+//               da lectura a los datos de esa escuela.
+// - jugador:    cuentas viejas del seed (rol fijo + jugadorId).
+//
+// Nadie puede darse a sí mismo 'dt' ni 'admin': al crear su perfil una cuenta
+// solo puede elegir profesor, acudiente o estudiante, y no puede cambiar su
+// rol después. El primer admin se pone a mano en la consola de Firebase.
+//
+// Limitación conocida (igual que antes): Firestore no filtra campos, así que
+// un miembro que lea `jugadores/{id}` directo (no vía la UI) puede ver las
+// métricas de los compañeros de su escuela aunque la app se las oculte.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -17,105 +26,189 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function usuario() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    function rutaPerfil() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.uid);
     }
 
-    function esDT() {
-      return autenticado() && usuario().rol == 'dt';
+    function tienePerfil() {
+      return autenticado() && exists(rutaPerfil());
     }
 
-    function esJugador() {
-      return autenticado() && usuario().rol == 'jugador';
+    function perfil() {
+      return get(rutaPerfil()).data;
     }
 
-    function miJugadorId() {
-      return usuario().jugadorId;
+    function esAdmin() {
+      return tienePerfil() && perfil().rol == 'admin';
     }
 
-    // Una cuenta que se crea a sí misma solo puede hacerlo como 'jugador' y
-    // enlazada a un jugadorId que ya exista en el plantel: nunca como 'dt'.
-    // Sin esta validación, `allow create` solo miraba el uid, así que
-    // cualquier persona autenticada podía escribir rol: 'dt' en su propio
-    // documento y ganar todos los permisos — la app hoy no tiene pantalla
-    // de alta (las cuentas las crea el DT o el script de seed), pero la
-    // regla es la barrera real, no la UI.
-    function altaPropiaValida() {
-      return request.resource.data.rol == 'jugador'
-        && request.resource.data.jugadorId is string
-        && exists(/databases/$(database)/documents/jugadores/$(request.resource.data.jugadorId));
+    function escuelaDelPerfil() {
+      return perfil().get('escuelaId', 'makuira');
     }
 
-    // Cada usuario puede crear su propio documento (alta de cuenta), con la
-    // validación de arriba; el DT puede crear el de cualquiera (alta de
-    // jugadores) y editar cualquiera.
+    function esDTde(escuelaId) {
+      return tienePerfil() && perfil().rol == 'dt' && escuelaDelPerfil() == escuelaId;
+    }
+
+    function rutaMiembro(escuelaId) {
+      return /databases/$(database)/documents/escuelas/$(escuelaId)/miembros/$(request.auth.uid);
+    }
+
+    function esMiembro(escuelaId) {
+      return autenticado() && exists(rutaMiembro(escuelaId));
+    }
+
+    function esJugadorViejoDe(escuelaId) {
+      return tienePerfil() && perfil().rol == 'jugador' && escuelaDelPerfil() == escuelaId;
+    }
+
+    function puedeLeerEscuela(escuelaId) {
+      return esDTde(escuelaId) || esMiembro(escuelaId) || esJugadorViejoDe(escuelaId) || esAdmin();
+    }
+
+    function soloCambian(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+
+    // ── Perfiles ────────────────────────────────────────────────────────
     match /usuarios/{uid} {
-      allow read: if autenticado() && request.auth.uid == uid;
-      allow read: if esDT();
-      allow create: if autenticado() && request.auth.uid == uid && altaPropiaValida();
-      allow create: if esDT();
-      allow update, delete: if esDT();
+      allow read: if autenticado() && (request.auth.uid == uid || esAdmin());
+
+      // Alta propia: solo roles de registro, nunca 'dt' ni 'admin'.
+      allow create: if autenticado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['rol', 'nombre', 'correo', 'creado'])
+        && request.resource.data.rol in ['profesor', 'acudiente', 'estudiante']
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2 && request.resource.data.nombre.size() <= 80
+        && request.resource.data.correo == request.auth.token.get('email', '');
+
+      // Cada quien puede corregir su nombre; el rol y la escuela, solo el admin.
+      allow update: if autenticado() && request.auth.uid == uid && soloCambian(['nombre'])
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 80;
+      allow update, delete: if esAdmin();
     }
 
-    // Público de lectura: la pantalla de login muestra el nombre del club
-    // antes de que la persona inicie sesión, y no es información sensible.
-    match /club/{docId} {
-      allow read: if true;
-      allow write: if esDT();
-    }
+    // ── Escuelas ────────────────────────────────────────────────────────
+    match /escuelas/{escuelaId} {
+      // Las aprobadas son el catálogo que ven las familias; las pendientes
+      // o rechazadas, solo su dueño y el admin.
+      allow read: if autenticado() && (
+        resource.data.estado == 'aprobada'
+        || resource.data.duenoUid == request.auth.uid
+        || puedeLeerEscuela(escuelaId)
+      );
 
-    match /jugadores/{jugadorId} {
-      allow read: if autenticado();
-      allow write: if esDT();
-    }
+      allow create: if tienePerfil() && perfil().rol == 'profesor'
+        && escuelaId.matches('MK-[A-Z0-9]{6}')
+        && request.resource.data.id == escuelaId
+        && request.resource.data.duenoUid == request.auth.uid
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.motivoRechazo == ''
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() >= 3
+        && request.resource.data.direccion is string && request.resource.data.direccion.size() >= 5
+        && request.resource.data.profesores is list && request.resource.data.profesores.size() >= 1
+        && request.resource.data.fotoProfesorId is string && request.resource.data.fotoProfesorId.size() > 0;
 
-    match /partidos/{partidoId} {
-      allow read: if autenticado();
-      allow write: if esDT();
+      // El DT puede editar la ficha de su escuela, pero no aprobarse.
+      allow update: if esDTde(escuelaId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['estado', 'duenoUid', 'id', 'motivoRechazo']);
+      allow update, delete: if esAdmin();
 
-      match /eventos/{eventoId} {
-        allow read: if autenticado();
-        allow write: if esDT();
+      // Quién pertenece a la escuela (acudientes y estudiantes aceptados).
+      match /miembros/{uid} {
+        allow read: if autenticado() && (request.auth.uid == uid || esDTde(escuelaId) || esAdmin());
+        allow write: if esDTde(escuelaId);
+      }
+
+      match /jugadores/{jugadorId} {
+        allow read: if puedeLeerEscuela(escuelaId);
+        allow write: if esDTde(escuelaId);
+      }
+
+      match /partidos/{partidoId} {
+        allow read: if puedeLeerEscuela(escuelaId);
+        allow write: if esDTde(escuelaId);
+
+        match /eventos/{eventoId} {
+          allow read: if puedeLeerEscuela(escuelaId);
+          allow write: if esDTde(escuelaId);
+        }
+      }
+
+      match /sesiones/{sesionId} {
+        allow read: if puedeLeerEscuela(escuelaId);
+        allow write: if esDTde(escuelaId);
+      }
+
+      match /alineaciones/{alineacionId} {
+        allow read: if puedeLeerEscuela(escuelaId);
+        allow write: if esDTde(escuelaId);
+      }
+
+      match /convocatorias/{partidoId} {
+        allow read: if puedeLeerEscuela(escuelaId);
+        allow write: if esDTde(escuelaId);
+      }
+
+      match /caja/{periodo} {
+        allow read: if puedeLeerEscuela(escuelaId);
+        allow write: if esDTde(escuelaId);
+
+        match /cuotas/{jugadorId} {
+          allow read: if puedeLeerEscuela(escuelaId);
+          allow create, delete: if esDTde(escuelaId);
+          // El jugador (o su acudiente) solo puede pasar SU cuota de
+          // "pendiente" a "reportada" (reportar pago); lo demás, el DT.
+          allow update: if esDTde(escuelaId) || (
+            (
+              (esJugadorViejoDe(escuelaId) && perfil().jugadorId == jugadorId)
+              || (esMiembro(escuelaId) && jugadorId in get(rutaMiembro(escuelaId)).data.jugadorIds)
+            )
+            && resource.data.estado == 'pendiente'
+            && request.resource.data.estado == 'reportada'
+            && soloCambian(['estado'])
+          );
+        }
       }
     }
 
-    match /sesiones/{sesionId} {
-      allow read: if autenticado();
-      allow write: if esDT();
+    // ── Inscripciones (pedidos de cupo) ─────────────────────────────────
+    match /inscripciones/{inscripcionId} {
+      allow read: if autenticado() && (
+        resource.data.solicitanteUid == request.auth.uid
+        || esDTde(resource.data.escuelaId)
+        || esAdmin()
+      );
+
+      allow create: if tienePerfil()
+        && perfil().rol in ['acudiente', 'estudiante']
+        && request.resource.data.solicitanteUid == request.auth.uid
+        && request.resource.data.paraSiMismo == (perfil().rol == 'estudiante')
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.jugadorId == null
+        && request.resource.data.nombreJugador is string && request.resource.data.nombreJugador.size() >= 3
+        && request.resource.data.edad is int
+        && get(/databases/$(database)/documents/escuelas/$(request.resource.data.escuelaId)).data.estado == 'aprobada';
+
+      // Solo el DT de esa escuela responde, y no puede moverla a otra escuela
+      // ni cambiar quién la pidió.
+      allow update: if esDTde(resource.data.escuelaId) && soloCambian(['estado', 'jugadorId'])
+        && request.resource.data.estado in ['aprobada', 'rechazada'];
+
+      allow delete: if autenticado() && (
+        (resource.data.solicitanteUid == request.auth.uid && resource.data.estado == 'pendiente')
+        || esAdmin()
+      );
     }
 
-    match /alineaciones/{alineacionId} {
+    // ── Fotos (base64 comprimido; ver FotoRepositorio) ──────────────────
+    match /fotos/{fotoId} {
       allow read: if autenticado();
-      allow write: if esDT();
-    }
-
-    match /convocatorias/{partidoId} {
-      allow read: if autenticado();
-      allow write: if esDT();
-    }
-
-    // Caja: lectura abierta a cualquier persona logueada (igual que
-    // jugadores/partidos/sesiones) — el filtro de "el jugador solo ve la
-    // suya" ya lo aplica AppEstado del lado del cliente. Se evita a
-    // propósito una regla de lectura que dependa de esDT() (que hace un
-    // get() interno): en consultas de lista, ese patrón resultó poco
-    // confiable en el SDK nativo de Android (funcionaba por REST pero
-    // fallaba de forma intermitente desde la app).
-    match /caja/{periodo} {
-      allow read: if autenticado();
-      allow write: if esDT();
-
-      match /cuotas/{jugadorId} {
-        allow read: if autenticado();
-        allow create, delete: if esDT();
-        // El jugador solo puede cambiar su cuota de "pendiente" a
-        // "reportada" (reportar pago); todo lo demás, solo el DT.
-        allow update: if esDT() ||
-          (esJugador() && miJugadorId() == jugadorId &&
-           resource.data.estado == 'pendiente' &&
-           request.resource.data.estado == 'reportada' &&
-           request.resource.data.monto == resource.data.monto);
-      }
+      allow create: if autenticado()
+        && request.resource.data.duenoUid == request.auth.uid
+        && request.resource.data.datos is string
+        && request.resource.data.datos.size() < 950000;
+      allow delete: if autenticado() && (resource.data.duenoUid == request.auth.uid || esAdmin());
     }
   }
 }
